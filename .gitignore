@@ -11,7 +11,15 @@ venv/
 */.ipynb_checkpoints/*
 
 # [Data & Models]
-data/
+# Course staff: data/* instead of data/ so that data/README.md can be kept.
+data/*
+!data/README.md
+# Course staff: the C-MAPSS download and the BRNN checkpoints stay out (see data/README.md).
+*_FD00[1-4].txt
+CMAPSSData/
+CMAPSSData.zip
+6. Turbofan Engine Degradation Simulation Data Set*/
+*.pth
 *.csv
 *.gz
 *.pkl
@@ -29,6 +37,8 @@ data/
 *.pdf
 !reports/figures/
 !viz/eda_plot.png
+# Course staff: the program banner.
+!.github/assets/*.png
 .Rhistory
 .RData
 .Ruserdata

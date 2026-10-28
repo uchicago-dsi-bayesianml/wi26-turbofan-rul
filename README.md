@@ -1,367 +1,193 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/banner-dark.png">
+  <img alt="The University of Chicago, MS in Applied Data Science. ADSP 32014 course project." src=".github/assets/banner-light.png">
+</picture>
+
 # Predictive Maintenance for Aircraft Engines: RUL Estimation
 
-This repository explores multiple probabilistic and machine learning approaches to predict the **Remaining Useful Life (RUL)** of aircraft engines using the **NASA C-MAPSS** dataset. The project transitions from foundational Bayesian models to complex temporal architectures to optimize for both accuracy and safety-critical risk management.
+> **Example project from Winter 2026.** This is a copy of [asingh49-cmd/RUL-and-Engine-Degradation-Bayesian-ML-Project](https://github.com/asingh49-cmd/RUL-and-Engine-Degradation-Bayesian-ML-Project), shown with the authors' work and commit history intact. Their own write-up is [REPORT.md](REPORT.md). Course staff wrote this README and made the edits listed under [Changes by course staff](#changes-by-course-staff), including the section on [what to learn from this project](#what-to-learn-from-this-project) and a script, `staff/check_scores.py`, that recomputes the scores. The NASA C-MAPSS data is not in this repository; NASA's repository states no license and asks to be acknowledged, and [data/README.md](data/README.md) explains how to get it.
 
-## 1. Business Problem
+A turbofan engine wears out gradually, and its sensors drift as it does. Given an engine's sensor history up to today, how many more cycles will it run, and how sure can we be? On NASA's C-MAPSS FD001 benchmark, 100 simulated engines run to failure for training and 100 cut off before failure for testing, each of the five team members built a different model of the remaining useful life (RUL): a hierarchical Bayesian regression sampled with NUTS, a dynamic Bayesian network and an unscented Kalman filter, a linear Kalman filter beside a random-forest ensemble, Meta's Prophet, and a CNN, attention and LSTM network with Monte Carlo dropout. A Bayesian online changepoint detector, written from scratch, sets the cycle at which the network's training labels start to count down. The write-up ranks the network first, by the benchmark's asymmetric score.
 
-Aircraft engine maintenance traditionally relies on **scheduled inspections** or **reactive replacement**. Both methods are inefficient: reactive maintenance risks catastrophic failure, while preventive maintenance often replaces healthy components prematurely.
+## Summary
 
-Predicting **Remaining Useful Life (RUL)** enables **Predictive Maintenance**, allowing operators to:
-* Schedule maintenance precisely before failure.
-* Reduce operational disruptions and safety risks.
-* Optimize maintenance costs and component longevity.
+**Data.** C-MAPSS FD001, simulated at one operating condition with one fault mode: 20,631 rows for the 100 training engines and 13,096 for the 100 test engines, one row per cycle with three settings and 21 sensors, and `RUL_FD001.txt` with the true RUL of each test engine after its last cycle. The standard evaluation scores one prediction per test engine, at its last cycle, against that file, by RMSE and by the PHM08 score that the notebooks call the NASA score.
 
-### Dataset: NASA C-MAPSS
-We utilize the **FD001** turbofan degradation dataset, which includes:
-* **100 engines** run to failure for training.
-* **21 sensor variables** and **3 operational settings**.
-* High-noise, non-linear degradation trajectories.
+**Labels.** Several notebooks cap the training RUL at 120 or 125 cycles, since an engine far from failure looks healthy and its distance from failure cannot be read from the sensors. The changepoint detector instead finds, engine by engine, the cycle at which three sensors leave their healthy baseline; the average, 112 cycles, becomes the BRNN notebook's onset, before which the label is held flat.
 
----
+**Models.** A Student-t regression of log RUL with a random intercept per engine, in PyMC. A two-slice dynamic Bayesian network over binned sensors, and an unscented Kalman filter on a one-dimensional health state. A linear Kalman filter on health and degradation rate, and five random forests with quantile gradient boosting for an 80 percent interval, which the authors call BSTS. Prophet with 18 regressors. A network of a 1-D convolution, self-attention and an LSTM over 30-cycle windows, trained with an asymmetric loss and sampled 100 times with dropout on, which the write-up calls the BRNN. A GRU sits beside them as a baseline.
 
-## 2. EDA (Exploratory Data Analysis)
+**Results as reported.** The write-up's final table ranks the network first (score 1,138.28, RMSE 24.30), then Prophet (1,265.47, 22.69), the random forests (2,067, 19.51) and the unscented Kalman filter (3,311.77, 35.85).
 
-Exploratory analysis was conducted to identify degradation signals across 21 sensors. Key findings include:
-* **High Correlation Sensors**: Sensors 11, 4, 12, 7, and 15 show strong monotonic trends (|r| > 0.64) with RUL.
-* **Feature Redundancy**: 8 sensors were identified as constant (zero variance) and removed to reduce model noise.
-* **Degradation Patterns**: Most engines exhibit a "healthy" initial phase followed by an accelerating degradation phase, motivating the use of **Piecewise RUL labeling**.
+The staff section below explains why that ranking does not hold: the notebooks for four of the models swap the score's two constants, the network's number was chosen on the test set and scored against labels that differ from the official ones for 34 of the 100 test engines, and the model called BSTS is a random forest. Rescored on the standard protocol, the forests come first.
 
-![EDA Analysis](./viz/eda_plot.png)
-*(Note: Placeholder for EDA visualization showing sensor trends vs. RUL cycles)*
+## Team and contributions
 
----
+Team "The Priors of the Caribbean", Winter 2026.
 
-## 3. Modeling & Technical Analysis
+- **Adi Singh** ([@asingh49-cmd](https://github.com/asingh49-cmd)): the repository; the linear Kalman filter and the random-forest model, in both `bsts_kf_rul_comparison` notebooks, with their README and figures; the preprocessing in `LSTM_Model.ipynb`; the upload of the Prophet notebook into `prophet_model/`; and the BSTS and Kalman sections of the write-up.
+- **Ryan Chen** ([@RyanChenJung](https://github.com/RyanChenJung)): `BOCPD.ipynb`, both BRNN notebooks and the BRNN README, the folder layout and ignore rules, the EDA figure, and the merges of the team's pull requests. He also committed early copies of Eduardo's hierarchical model.
+- **William Niu** ([@williamniu](https://github.com/williamniu), committing as CasperNiu): `Prophet_Meta.ipynb` and the Prophet README, `GRU_Final_Version.ipynb`, and the last round of edits to the write-up, including its results table.
+- **Mukul Ramesh** ([@MukulRamesh](https://github.com/MukulRamesh)): `DBN1.ipynb` to `DBN4.ipynb`, which hold the dynamic Bayesian network and both versions of the unscented Kalman filter, the README for that folder, and the DBN and UKF sections of the write-up.
+- **Eduardo (Lalo) Tovilla Rivera** ([@Eduardo-Tovilla](https://github.com/Eduardo-Tovilla)): the hierarchical Bayesian model notebook and its README, and the project overview in the write-up.
 
-The project implements a progression of models, moving from static Bayesian inference to dynamic temporal sequences.
+The repository ran from February 10 to March 13, 2026. Several notebooks were saved from Colab or uploaded through GitHub's web interface, so the account that committed a notebook is not necessarily its only author; the attributions follow the [commit history](https://github.com/uchicago-dsi-bayesianml/wi26-turbofan-rul/commits/main) and the contributor table in the Prophet README.
 
-### [Hierarchical Bayesian Model](./notebooks/hierarchical_bayesian_model(hbm)/README.md)
-#### Target Transformation
+**Borrowed pieces.** `gen_sequence` and `gen_labels` in `brnn_v2.ipynb` cell 2 are adapted from the helpers in Microsoft's [Deep Learning Basics for Predictive Maintenance](https://github.com/Azure/lstms_for_predictive_maintenance) notebook (MIT), which many C-MAPSS projects reuse, among them [umbertogriffo/Predictive-Maintenance-using-LSTM](https://github.com/umbertogriffo/Predictive-Maintenance-using-LSTM). The changepoint detector follows R. P. Adams and D. J. C. MacKay, "Bayesian Online Changepoint Detection" (2007). `brnn_v1.ipynb` was produced with Gemini's Data Science Agent in Colab: its Task, Subtask and Reasoning cells and closing Q&A summary are that tool's format.
 
-To stabilize variance, the target variable is transformed as:
+## Getting started
 
-$$
-y = \log(1 + RUL)
-$$
+There is no requirements file. Beyond the scientific Python stack, the notebooks use PyTorch (BRNN, GRU), PyMC and ArviZ (hierarchical model), pgmpy (DBN), filterpy (Kalman filters), statsmodels (first BSTS notebook) and Prophet.
 
-Predictions are later mapped back to the original RUL scale using the inverse transformation.
-
-#### Features
-
-The model uses operational settings and sensor measurements:
-
-- Operational settings (`setting_1–3`)
-- Sensor readings (`s1–s21`)
-- Engine cycle index
-- First-order sensor differences (`sensor_diff`)
-
-Sensor differences help capture degradation trends across cycles.
-
-#### Model
-
-We assume a Student-t observation model:
-
-$$
-y_i \sim \text{StudentT}(\nu, \mu_i, \sigma)
-$$
-
-with linear predictor:
-
-$$
-\mu_i = \alpha + X_i \beta
-$$
-
-where $\alpha$ is the intercept, $X_i$ the feature vector, and $\beta$ the regression coefficients.
-
-#### Hierarchical Priors
-
-We propose the following priors:
-
-$$
-\nu \sim \text{Exponential}(1/10), \quad
-\sigma \sim \text{HalfNormal}(1), \quad
-\alpha \sim \mathcal{N}(0, 1), \quad  
-\beta_j \sim \mathcal{N}(0,\tau^2), \quad
-\tau \sim \text{HalfNormal}(1)
-$$
-
-#### Inference
-
-Posterior inference is performed using the **No-U-Turn Sampler (NUTS)**, generating posterior predictive distributions that provide both RUL estimates and uncertainty intervals.
-
-#### Conslusion
-
-Hierarchical Abyesian turns out to be a foundational approach using **Student-t Likelihood** and **NUTS sampling** to quantify prediction uncertainty, and It employs hierarchical shrinkage to stabilize sensor coefficients but is limited by its linear mean structure.
-
-### [Dynamic Bayesian Network (DBN) and Unscented Kalman Filter (UKF)](./notebooks/dynamic_bayesian_network_(dbn)/README.md)
-While excellent for tracking hidden health states, these models struggled with the exponential penalty of the NASA Score due to their reliance on rigid process models.
-
-#### Dynamic Bayesian Network (DBN)
-The DBN is a graphical model that captures temporal and instantaneous dependencies between operational settings and sensor readings.
-
-- The network architecture contains 34 nodes and 77 edges across two time slices.
-- Continuous features were discretized into 5 bins using quantile binning to facilitate the model.
-- This approach yields high interpretability for understanding sensor relationships but loses fine-grained information due to discretization.
-<img width="1143" height="547" alt="image" src="https://github.com/user-attachments/assets/0c77bb30-eb00-4f8c-90fd-5fe5bf3a8f3c" />
-
-
-#### Unscented Kalman Filter (UKF)
-The UKF is a recursive Bayesian filter used to estimate the hidden health state of an engine from noisy sensor observations.
-
-- The advanced "Mark II" implementation uses PCA to compress 14 sensors into 2 principal components.
-- Degradation is modeled using an exponential decay function defined by the following state equations:
-
-$$x(t + 1) = x(t) - \text{decay} \times dt$$
-
-$$\text{decay} = \text{baseline} \times \exp(\text{curvature} \times (1 - x(t)))$$
-
-The UKF tracks engine health continuously but is highly sensitive to hyperparameters like baseline and curvature.
-
-#### Results
-- The DBN achieved a mean accuracy of roughly 52.6% for predicting 5-bin sensor states.
-
-- The UKF Mark II model achieved a Root Mean Square Error (RMSE) of 35.85 on the test set.
-<img width="989" height="590" alt="UKFtestdataresults" src="https://github.com/user-attachments/assets/75088b96-eefd-4bc7-875f-a8e61e651bd8" />
-
-- The UKF scored 3,311.77 on the official CMAPSS evaluation metric.
-
-- The CMAPSS scoring function heavily penalizes late RUL predictions compared to early predictions.
-
-- Both models struggle significantly with outlier engines that fail unexpectedly early.
-### [LSTM & GRU](./notebooks/time_series_models)
-Standard **Recurrent Neural Network** architectures designed to capture long-term dependencies in sensor time series.
-
-### [Bayesian Time Series Model (BSTS)](./notebooks/bayesian_time_series_model(bsts)/README.md)
-
-**Input Features**: 8 sensors (temperature, pressure, speed) + cycle number (RUL Cap of 120) 
-
-**BSTS Architecture**: 5× Random Forest (100 trees each, max_depth=20) + Gradient Boosting quantiles  
-**Kalman Filter Parameters**: Q=0.05, R=1.0, constrained health ∈ [0,1.2]
-  - The H Matrix - The Sensor Connection to Health
-  - Q Matrix (Process Noise) - How uncertain are we about the degradation model?
-  - R Matrix (Measurement Noise) - How noisy are the sensors?
-
-## Two BSTS Approaches Tested
- 
-### **1. Kalman Filter (Physics-Based)**
-**Idea**: Track hidden "health" state using sensor measurements
-```
-State: [health, degradation_rate]
-health(t+1) = health(t) - rate
-RUL = health / rate
-```
- 
-**Benefits and Drawbacks:**
-- Interpretable (explicit health tracking)
-- Requires extensive tuning (Q, R, H matrix)
-- Assumes linear relationships
- 
-### **2. BSTS (Data-Driven Ensemble)**
-**Idea**: Ensemble of 5 Random Forests + quantile regression for uncertainty
-```
-5 RF models → mean prediction
-Quantile regression → 80% confidence intervals
-```
- 
-**Benefits and Drawbacks**:
-- Captures non-linear sensor patterns
-- Robust with default parameters
-- Ensemble provides natural uncertainty
-
- ## Results
- 
-![Performance Comparison](notebooks/bayesian_time_series_model(bsts)/comparison_scatter.png)
- 
-| Metric | Kalman Filter | BSTS | Winner |
-|--------|---------------|------|--------|
-| **RMSE** | 77.80 cycles | **19.51 cycles** | **BSTS (4× better)** |
-| **NASA Score** | 4,335,314 | **2,067** | **BSTS (2,097× better)** |
-| **80% CI Coverage** | 26% | 65% | **BSTS** |
- 
-### **Key Visual Insights**
- 
-**Left (Kalman)**: Predictions collapsed near zero - failed to track degradation  
-**Right (BSTS)**: Strong correlation with true RUL across full range
-
-**Key Takeaway**: BSTS achieved competitive performance (RMSE=19.51) with robust uncertainty quantification, outperforming the tuned Kalman Filter by 4×.
-
-### [Prophet](./notebooks/prophet_model/README.md)
-An **additive regression model** that treats RUL prediction as a curve-fitting problem. It offers a strong balance between simplicity and performance, performing nearly as well as more complex deep learning models.
-
-This module applies **Meta's Prophet** — a Bayesian structural time-series model — to the task of **Remaining Useful Life (RUL) prediction** for aircraft turbofan engines, using the NASA C-MAPSS FD001 benchmark dataset.
-
-Prophet was originally designed for calendar-driven business forecasting. Here, it is repurposed as a **Bayesian regression framework** by disabling all seasonality components and driving predictions entirely through 18 sensor and operational-setting regressors. Two growth modes are explored and compared:
-
-| Model | Prophet Growth Mode | Core Idea |
-|-------|---------------------|-----------|
-| **Linear Trend** | `linear` | Piece-wise linear degradation trend; predictions clipped to `[0, 125]` post-inference |
-| **Logistic Trend** | `logistic` | Saturating growth with explicit floor and cap enforces bounded RUL predictions natively |
-
-The work sits within a broader **Bayesian ML group project** at the University of Chicago, where five methods are compared side-by-side on the same dataset.
-
----
-
-
-## Model Architecture
-
-Prophet decomposes the target signal into additive components:
-
-$$y(t) = g(t) + s(t) + h(t) + \boldsymbol{\beta}^\top \mathbf{x}(t) + \varepsilon_t$$
-
-| Component | Symbol | Role in this application |
-|-----------|--------|--------------------------|
-| Trend | $g(t)$ | Captures the engine's underlying degradation trajectory |
-| Seasonality | $s(t)$ | **Disabled** — no calendar effects in mechanical data |
-| Holidays | $h(t)$ | **Disabled** |
-| External regressors | $\boldsymbol{\beta}^\top \mathbf{x}(t)$ | All 18 sensor/setting features drive the prediction |
-| Noise | $\varepsilon_t$ | Gaussian observation noise |
-
-### Model 1 — Linear Trend
-
-```python
-Prophet(
-    growth="linear",
-    yearly_seasonality=False,
-    weekly_seasonality=False,
-    daily_seasonality=False,
-    changepoint_prior_scale=0.05
-)
+```sh
+python3 -m venv .venv && source .venv/bin/activate
+pip install numpy pandas scipy scikit-learn matplotlib seaborn tqdm torch pymc arviz pgmpy networkx filterpy statsmodels prophet jupyter
 ```
 
-The trend $g(t)$ is modeled as a **piece-wise linear function**:
+Download C-MAPSS as described in [data/README.md](data/README.md) and put the three FD001 files where each notebook expects them; the data note lists the paths.
 
-$$g(t) = (k + \mathbf{a}(t)^\top \boldsymbol{\delta})\,t + (m + \mathbf{a}(t)^\top \boldsymbol{\gamma})$$
+**The notebooks.** They are independent and can run in any order; only the BRNN's onset of 112 cycles comes from another notebook. Cell numbers in this README count every cell, markdown included, from 1.
 
-where $k$ is the base growth rate, $\boldsymbol{\delta}$ are changepoint adjustments, and $\mathbf{a}(t)$ is an indicator vector for active changepoints. Predictions are post-hoc clipped to $[0,\ 125]$.
+1. `notebooks/BOCPD.ipynb`: degradation onsets from Bayesian online changepoint detection.
+2. `notebooks/bayesian_recurrent_neural_network(brnn)/brnn_v2.ipynb`: the network, its MC dropout sampling and the post-hoc search. It was trained on a Colab T4 GPU.
+3. `notebooks/hierarchical_bayesian_model(hbm)/Hirechical Bayesian Model.ipynb`: the PyMC model.
+4. `notebooks/dynamic_bayesian_network_(dbn)/DBN1.ipynb` for the network and `DBN3.ipynb` for the unscented Kalman filter.
+5. `notebooks/bayesian_time_series_model(bsts)/bsts_kf_rul_comparison_updated.ipynb`: the linear Kalman filter and the random forests.
+6. `notebooks/prophet_model/Prophet_Meta.ipynb`: Prophet with a linear and a logistic trend.
 
-### Model 2 — Logistic (Non-Linear) Trend
+**Staff check.** `staff/check_scores.py` reads the FD001 files and the committed notebooks without running them. It lists which notebooks use the swapped score, counts the BRNN test labels that differ from `RUL_FD001.txt`, refits and rescores the random forests, shows that the Kalman filter's Q/R search cannot change anything, and computes a persistence baseline for the DBN. It needs NumPy and scikit-learn and takes about 20 seconds:
 
-```python
-Prophet(
-    growth="logistic",
-    yearly_seasonality=False,
-    weekly_seasonality=False,
-    daily_seasonality=False,
-    changepoint_prior_scale=0.05
-)
+```sh
+pip install numpy scikit-learn
+python staff/check_scores.py "path/to/CMAPSSData"
 ```
 
-The trend is replaced by a **saturating logistic function**:
+**What does not run as committed.** Every notebook reads the data from its own location, several from a Google Drive folder. `Prophet_Meta.ipynb` cell 19, which produced the logistic model's test numbers, cannot have run as saved: it groups by a `unit_id` column that its frame does not have, and it passes `untertainty_samples`, an argument `Prophet.predict` does not take. `brnn_v2.ipynb` prints its messages in Chinese while its source prints them in English, so the source was translated after the run. The warnings saved in `DBN1.ipynb` cell 5 are the ones the discretizer gives when it runs a second time on its own output (the staff script reproduces both cases), so the committed DBN results come from a session in which that cell ran twice. The hierarchical model ran with `FAST_DEBUG = True`, on one row in 25; its sampler took 3,681 seconds without a C compiler. Both BSTS notebooks were run out of order, and `LSTM_Model.ipynb` stops after preprocessing.
 
-$$g(t) = \frac{L}{1 + e^{-(k + a(t)^\top \boldsymbol{\delta})(t - (m + a(t)^\top \boldsymbol{\gamma}))}}$$
+## Data
 
-- `cap = 125` (= `RUL_CAP`) is passed as a column in the DataFrame, enforcing the natural upper bound.
-- `floor = 0` prevents negative predictions natively at the model level.
-- This eliminates the need for post-hoc output clipping.
+[data/README.md](data/README.md) has the download links, citation, terms and the path each notebook expects. In short:
 
----
+- **Source:** the "Turbofan Engine Degradation Simulation Data Set" (C-MAPSS) from the NASA Prognostics Data Repository (Saxena and Goebel, 2008), described in Saxena, Goebel, Simon and Eklund, PHM08. The project uses FD001, one of four subsets, three text files of about 6 MB.
+- **Terms:** NASA's pages state no license. The repository asks that publications acknowledge it and the data donors, and the data are used at the user's own risk.
+- **The split:** the benchmark fixes the training and test engines. For validation, the hierarchical model, the BSTS notebook and the GRU hold out training engines rather than rows, which is the right way to do it.
 
-<img width="500" height="500" alt="Screenshot 2026-03-13 133713" src="https://github.com/user-attachments/assets/c3d84d0d-a549-4c18-819b-2554fd7e70f0" />
+## Project structure
 
-<img width="700" height="500" alt="image" src="https://github.com/user-attachments/assets/1520f97c-9418-44b9-a8e5-94791b84bbe7" />
+| Path | Contents |
+|---|---|
+| `REPORT.md` | The authors' write-up: the business problem, EDA, each model, the comparison table and the conclusions. |
+| `notebooks/BOCPD.ipynb` | Sensor trendability, engine lifetimes, a multivariate BOCPD written from scratch, per-engine onsets and two grid searches over its settings. |
+| `notebooks/bayesian_recurrent_neural_network(brnn)/` | `brnn_v2.ipynb`, the final network with its MC dropout and post-hoc search; `brnn_v1.ipynb`, the first version, written with Gemini's Data Science Agent in Colab; and the BRNN README. |
+| `notebooks/hierarchical_bayesian_model(hbm)/` | The PyMC model and its README. The misspelled file name is the authors'. |
+| `notebooks/dynamic_bayesian_network_(dbn)/` | `DBN1.ipynb`, the dynamic Bayesian network; `DBN2.ipynb`, exploratory analysis; `DBN3.ipynb`, the unscented Kalman filter, Mark I and Mark II; `DBN4.ipynb`, Mark II with the extrapolation capped at 112 cycles and an evaluation on truncated training engines; and the folder README. |
+| `notebooks/bayesian_time_series_model(bsts)/` | `bsts_kf_rul_comparison_updated.ipynb`, the linear Kalman filter and the random forests, with two figures; `bsts_kf_rul_comparison.ipynb`, the earlier version whose structural time-series model leaked the test labels; and the BSTS README. |
+| `notebooks/prophet_model/` | The Prophet notebook and its README. A byte-identical copy in `time_series_models/` was removed. |
+| `notebooks/time_series_models/` | `GRU_Final_Version.ipynb`, a two-layer GRU on 30-cycle windows, and `LSTM_Model.ipynb`, preprocessing for an LSTM that was not built. |
+| `viz/eda_plot.png` | The EDA figure in the write-up. |
+| `data/README.md`, `staff/check_scores.py` | Course staff's data note and check of the scores. |
 
-## Final Results
+## Method
 
-Evaluation is performed on the **FD001 test set** (100 engines). For each engine, only the **final cycle's prediction** is compared against the ground-truth RUL.
+**Changepoint detection.** `BOCPD.ipynb` follows Adams and MacKay's Bayesian online changepoint detection. Sensors s11, s4 and s12 of each training engine are standardized against its first 30 cycles, each gets a Normal-Gamma prior, the three are treated as independent, and the run-length posterior is updated every cycle with a constant hazard of 1/100. The onset is the first drop in the most probable run length after cycle 50. Cell 5 finds one in every engine, on average at cycle 112.38, from 76 to 135 among the first ten engines; cells 6 and 7 search 1,296 and 972 settings.
 
-### Metrics Summary
+**The network.** `brnn_v2.ipynb` cuts the training engines into 17,731 windows of 30 cycles over two settings and 14 sensors. The label is RUL held flat until cycle 112, so an engine that lives *L* cycles starts at *L* − 112 rather than at a common cap. A 1-D convolution, four-head self-attention, a two-layer LSTM and a dense head with dropout 0.3 give an output clamped to [0, 130]. Training runs 100 epochs, with Huber loss for 40 and then a weighted Huber loss plus a penalty on late predictions; after every epoch the score is computed on the last windows of the 100 test engines and the best epoch is kept. MC dropout makes 100 passes, and grids over an offset, a multiple *k* of the dropout standard deviation and a ceiling post-process the mean.
 
-| Model | Split | MAE | RMSE | NASA Score |
-|-------|-------|-----|------|------------|
-| Linear Trend | Train | 14.08 | 18.55 | — |
-| Linear Trend | **Test** | **17.84** | **22.62** | **1289.23** |
-| Logistic Trend | Train | 14.50 | 19.04 | — |
-| Logistic Trend | **Test** | **17.91** | **22.69** | **1265.46** |
+**Hierarchical regression.** The target is log(1 + RUL), uncapped, on 46 features: cycle, the settings, the 21 sensors and their first differences. The likelihood is Student-t with ν ~ Exponential(1/10) and σ ~ HalfNormal(1), and the mean is α + *b*<sub>engine</sub> + *X*β with α and each β ~ N(0, 1) and non-centered engine intercepts *b* ~ N(0, τ₀²), τ₀ ~ HalfNormal(1). The split is 80 training and 20 validation engines; with `FAST_DEBUG` on, the model sees every 25th cycle, 702 rows, with 300 tuning and 300 NUTS draws on two chains. For a new engine the predictive variance adds τ₀² to σ². The write-up describes a different prior, β ~ N(0, τ²) with a shared τ, which the code does not have.
 
-### [Bayesian Recurrent Neural Network (BRNN)](./notebooks/bayesian_recurrent_neural_network(brnn)/README.md) — **Best Performing Model**
-Our most advanced architecture, combining **CNN, Attention, and LSTM** layers with **Monte Carlo Dropout**. This model treats RUL prediction as a risk-aware optimization task, utilizing a custom **Asymmetric NASA Loss** and 3-D Calibration to minimize costly "late predictions."
+**Dynamic Bayesian network.** `DBN1.ipynb` bins 17 features (two settings and 15 sensors) into five quantile bins each and builds a two-slice network, 77 edges: every feature at *t* to itself at *t* + 1, and both settings to every sensor within a slice. Tables are fit by maximum likelihood on consecutive pairs of cycles, and variable elimination predicts the bin of sensor_11 at *t* + 1 from all features at *t*. It predicts a sensor, not the RUL.
 
-The solution is a multi-stage pipeline:
+**Unscented Kalman filter.** `DBN3.ipynb` tracks one health state *x* that starts at 1. Mark I observes two raw sensors with a linear decay; Mark II observes the first two principal components of 14 sensors, both as *x*, with decay rate *b* · exp(*c*(1 − *x*)). Q and R are learned by smoothing the first five training engines repeatedly and moving toward the residual covariances, and *b* and *c* come from a grid on training engines 81 to 90, cut 40 cycles before failure. The RUL is the number of steps the decay model needs, after the last cycle, to bring *x* to zero; the grid used a threshold of 0.2 instead.
 
-| Stage | Component | Purpose |
-|-------|-----------|---------|
-| **1** | Piecewise RUL + RobustScaler + Sliding Window | Physically-grounded feature engineering |
-| **2** | CNN-Attention-LSTM with Output Clamping | Temporal & spatial degradation feature extraction |
-| **3** | RUL-Weighted + Asymmetric NASA Loss | Safety-aware training objective |
-| **4** | MC Dropout (Bayesian Inference) | Quantified prediction uncertainty |
-| **5** | 3-D Grid Search Calibration | Post-hoc risk-minimising decision strategy |
+**Linear Kalman filter.** Health falls by the degradation rate each cycle, the observation matrix comes from each sensor's change between the first and last tenth of a life, both states are clipped after every update, and the RUL is health divided by rate.
 
+**The model called BSTS.** Five random forests of 100 trees and two gradient-boosting models for the 10th and 90th percentiles, on eight standardized sensors and the cycle number, with the RUL capped at 120. The markdown still describes a structural time-series model in statsmodels. That model was in the first notebook, fit to each test engine with labels built from the test truth (RMSE 1.01, `bsts_kf_rul_comparison.ipynb` cell 31), and the authors replaced it with the forests when they found the leak.
 
+**Prophet.** All training rows are laid end to end on an hourly time axis, the test rows continue it, and Prophet fits a linear or logistic trend plus 18 regressors, without seasonality, by its default MAP optimization. Predictions are clipped to [0, 125].
 
-The model architecture is a **three-stage hybrid neural network** that processes sensor time-series through local extraction, global attention, and temporal memory in sequence.
+### What is Bayesian here
 
-```
-Input (Batch, 30, 17)
-      │
-      ▼
-┌─────────────────────────────────────────────┐
-│  Module 1 · 1D-CNN                          │
-│  Conv1d → ReLU → BatchNorm                  │
-│  Local feature & trend extraction           │
-│  (automated rolling-feature equivalent)     │
-└────────────────────┬────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────┐
-│  Module 2 · Multi-Head Attention (4 heads)  │
-│  Input shape: (Seq_len, Batch, Embed_dim)   │
-│  Global inter-feature dependency learning   │
-│  (which cycles matter most?)                │
-└────────────────────┬────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────┐
-│  Module 3 · Bi-layer LSTM                   │
-│  Long-term degradation history modelling    │
-│  (remembers healthy → failure trajectory)   │
-└────────────────────┬────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────┐
-│  Module 4 · Bayesian FC Head (MC Dropout)   │
-│  Linear(hidden, 64) → ReLU → Dropout        │
-│  Linear(64, 1)                              │
-└────────────────────┬────────────────────────┘
-                     │
-                     ▼
-         torch.clamp(output, 0.0, 130.0)
-         ← Physical ceiling constraint →
-```
+Three parts are Bayesian in substance. The changepoint detector computes a posterior over the run length with conjugate updates; it is collapsed to one number, 112, that is then used for every engine. The hierarchical regression has priors on every parameter, partial pooling of the engine intercepts and a NUTS posterior, and its interval is checked: 90.2 percent of validation rows fall in its 90 percent interval (`Hirechical Bayesian Model.ipynb` cell 7). Its chains have not converged: R-hat is 1.20 for α and 1.12 for τ₀, with 11 and 14 effective draws (same cell). The two Kalman filters compute a Gaussian posterior over a hidden health state at every cycle, which is Bayesian filtering, but the RUL is then a deterministic extrapolation of the posterior mean, and the linear filter's interval is a fixed ±1.96 × 20 cycles rather than anything from its covariance.
 
+The network's MC dropout approximates a Bayesian neural network. Its spread enters only the post-hoc search and is never checked against the truth: the markdown in `brnn_v2.ipynb` cell 9 lists coverage, interval width, NLL and calibration error, and the code computes none of them. `model.train()` also switches the batch normalization to training mode during sampling, so each pass normalizes with the test batch's statistics. The dynamic Bayesian network is a discrete graphical model with maximum-likelihood tables and exact inference, the subject of the course's first homework, with no priors. Prophet has priors on its changepoints and regressors and is fit by MAP, which makes it a penalized regression; its intervals are not evaluated. The random forests and the quantile boosting are not Bayesian, and neither are the GRU and the LSTM.
 
-> **Final Performance:** NASA Score `1,138.28` · RMSE `24.3 cycles`
+## Results
 
----
+### As reported
 
-## 4. Conclusion & Project Evolution
+The write-up's final comparison:
 
-### The Technical Journey
-Our research followed a deliberate evolution based on performance feedback:
-1.  **Phase 1 (Foundational Bayesian)**: We initially deployed **HBM** and **DBN**. While mathematically elegant, they struggled to capture the rapid, non-linear changes in engine degradation, leading to poor **NASA Scores**.
-2.  **Phase 2 (Time Series Shift)**: We pivoted toward **Time Series** specific models. We discovered that capturing the temporal "momentum" of sensors was key. Traditional time series concepts allowed us to better track the accelerating wear-and-tear phase.
-3.  **Phase 3 (Optimization & Complexity)**: This led to the development of **BSTS**, **Prophet**, and **BRNN**. 
+| Model | RMSE | NASA score | Write-up's notes |
+|---|---:|---:|---|
+| BRNN | 24.30 | 1,138.28 | Best performance; Bayesian uncertainty |
+| Prophet | 22.69 | 1,265.47 | Excellent baseline |
+| BSTS | 19.51 | 2,067.00 | Good uncertainty calibration |
+| UKF (Mark II) | 35.85 | 3,311.77 | Sensitive to hyperparameters |
 
-### Model Performance Comparison
+Each row matches a notebook output, but not the one a reader would assume:
 
-| Model | RMSE | NASA Score | Characteristics |
-| :--- | :--- | :--- | :--- |
-| **BRNN** | **24.30** | **1,138.28** | Best Performance; High Complexity; Bayesian Uncertainty |
-| **Prophet** | 22.69 | 1265.47 | High Efficiency; Excellent baseline; Easy to tune |
-| **BSTS** | 19.51 | 2,067.00 | Robust Ensemble; Good Uncertainty Calibration |
-| **UKF (Mark II)** | 35.85 | 3,311.77 | Physics-based; Sensitive to hyperparameters |
+- **BRNN:** `brnn_v2.ipynb` cell 20, after the post-hoc search. The network as trained scores 1,851.31 with RMSE 25.63 (cell 10).
+- **Prophet:** the logistic model, cells 19 and 20, from the cell that cannot have run as saved. The linear model, whose cells can run, has RMSE 22.63 and score 1,289.23 (cells 12 and 14).
+- **BSTS:** the random forests, `bsts_kf_rul_comparison_updated.ipynb` cells 29 and 31, scored with the swapped constants.
+- **UKF:** `DBN3.ipynb` cell 11. `DBN4.ipynb` cell 12, which caps the extrapolation at 112 cycles instead of 500, prints the same two numbers.
 
-### Final Insights
-* **The SOTA vs. Simplicity Trade-off**: **BRNN** is our best model, offering the most sophisticated risk mitigation via MC Dropout. However, **Prophet** provides a surprisingly competitive alternative. For industrial applications where deployment speed and interpretability are paramount, Prophet is a highly viable candidate.
-* **Risk Management > Precision**: Our journey proved that minimizing **NASA Score** (avoiding late predictions) requires a different strategy than minimizing **RMSE**. Incorporating "pessimism" into the model calibration is essential for aviation safety.
+Elsewhere the write-up and the notebooks disagree. The write-up gives the forests' 80 percent interval a coverage of 65 percent; cell 29 prints 66.0. It gives the linear Kalman filter 26 percent; cell 37 prints 33.0 percent, for a 95 percent interval. It gives the DBN a mean next-step accuracy of about 52.6 percent over the 100 test engines; `DBN1.ipynb` cell 11 prints 75.92 percent, and no committed output shows 52.6.
 
----
+### On the standard protocol
 
-## 5. Contributors
-* **[Ryan Chen](https://github.com/RyanChenJung)**
-* **[Aditya Singh](https://github.com/asingh49-cmd)**
-* **[Mukul Ramesh](https://github.com/MukulRamesh)**
-* **[William Niu](https://github.com/williamniu)**
-* **[Eduardo Tovilla](https://github.com/Eduardo-Tovilla)**
+One prediction at each test engine's last cycle, scored against `RUL_FD001.txt` with the PHM08 constants (early /13, late /10). Lower is better for both columns.
 
----
-*Last Updated: March 2026*
+| Model | RMSE | Score | Source |
+|---|---:|---:|---|
+| Random forests, RUL cap 120 (chosen on the test set) | 19.51 | 790.7 | `staff/check_scores.py` |
+| Random forests, RUL cap 125 (the notebook's own setting) | 19.81 | 913.2 | `staff/check_scores.py` |
+| Prophet, linear trend | 22.63 | 1,289.2 | `Prophet_Meta.ipynb` cells 12 and 14 |
+| Unscented Kalman filter, Mark II | 35.85 | 3,311.8 | `DBN3.ipynb` cell 11 |
+| Linear Kalman filter | 77.80 | not recomputed | `bsts_kf_rul_comparison_updated.ipynb` cell 25 |
+| BRNN | not a valid test result | | see below |
+
+The staff refit reproduces the notebook's RMSE of 19.51, MAE of 13.94, coverage of 66.0 percent and swapped score of 2,067.3 exactly (its mean interval width is 41.19 cycles against the notebook's 41.42). With the correct constants the same predictions score 790.7, the best in the project. The cap of 120 was picked by trying 115, 120 and 125 on the test set (cells 29 and 40), so the notebook's configured cap of 125, at 19.81 and 913.2, is the fair number. The linear Kalman filter's predictions all lie between 0.0 and 32.6 cycles (cell 25).
+
+The BRNN has no valid test number. The epoch kept had the best test score (cell 8, epoch 54), the post-processing was the best of 704 combinations scored on the same 100 engines (cell 20), the score has the swapped constants, and its truth differs from `RUL_FD001.txt` for 34 engines. Of the ten engines the notebook lists as its worst late predictions (cell 10), four (1, 15, 22 and 85) are scored against labels 36 to 81 cycles below the truth, and three of those were in fact predicted early: engine 1, predicted at 98.1 cycles, has a true RUL of 112 and a label of 31.
+
+The hierarchical model was not scored at the test engines' last cycles. On all 13,096 test rows its RMSE is 55.57, and 40.16 on the rows with RUL of at most 120 (`Hirechical Bayesian Model.ipynb` cells 10 and 11). The GRU is evaluated on all 1,951 windows of 10 training engines it did not see, a different protocol: RMSE 12.81, with a swapped score (`GRU_Final_Version.ipynb` cell 9).
+
+### Other numbers in the notebooks
+
+- **The BRNN's post-hoc search** (`brnn_v2.ipynb`). Subtracting *k* standard deviations, the cautious direction, does not help: the best *k* is 0 (cell 14). A ceiling of 90 brings the score to 1,474.27 (cell 16), adding 12 cycles under that ceiling to 1,160.78 (cell 18), and the final rule adds 5 cycles plus 1.2 standard deviations and caps at 89 (cell 20). The winning shifts make predictions later, the direction the swapped constants favor.
+- **Hierarchical model.** Validation RMSE 41.89 cycles over rows; ν is about 1.7, a very heavy-tailed likelihood, with no divergences (cells 7 and 9). The "last-cycle" evaluation in cell 8 uses validation engines that ran to failure, where the true RUL is 0: RMSE 10.79, and none of the 20 intervals covers 0.
+- **Unscented Kalman filter.** Mark I scores RMSE 62.22 and 275,779.63 on the test set (`DBN3.ipynb` cell 5). Mark II's grid picks *b* = 0.003 and *c* = 2.0 (cell 9). On training engines cut at random points it scores RMSE 63.60 and 90,500,546.75 (`DBN4.ipynb` cell 15), much worse than on the test set.
+
+## What to learn from this project
+
+Course staff added this section. Five people built five working pipelines on one benchmark; the points below are about what their comparison can and cannot support.
+
+- **Check a scoring function against its definition.** The PHM08 score charges exp(−d/13) − 1 for an early prediction and exp(d/10) − 1 for a late one. The BRNN, hierarchical, BSTS and GRU notebooks have the constants the other way round, so a prediction 20 cycles late costs 3.66 instead of 6.39 and one 20 cycles early costs 6.39 instead of 3.66. The UKF notebooks (`DBN3`, `DBN4`) and the Prophet notebook have them right. The write-up's table mixes the two, and its prose about penalizing late predictions describes the correct formula while its best number was tuned with the other.
+- **Never let the test set choose anything.** The BRNN keeps the epoch with the best test score and picks its post-processing from 704 combinations on the same 100 engines; the forests' RUL cap was chosen by trying three caps on the test set. Each choice uses the answer key. Hold out training engines for these decisions, as the hierarchical model, the BSTS notebook and the GRU already do for validation.
+- **Score against the truth the benchmark gives you.** The BRNN's labeling function, applied to the test engines, caps each one's answer at its total life minus 112 cycles. For the 34 test engines observed for fewer than 112 cycles, that lowers the answer by 40.8 cycles on average and by up to 81. A label scheme for training is a modeling choice; the test truth is not.
+- **Call a model by what the code fits.** The "Bayesian time-series model" is five random forests and two quantile boosters, and Prophet's trend runs over a time axis made by laying 100 engines end to end. Both are fair baselines, and the forests are the best model in the project, but the names put them in the wrong place in a comparison of Bayesian methods.
+- **Check that a hyperparameter search can change something.** The Kalman filter's search over 16 values of Q and R returns 94.08 for every one, because the function never passes them to the filter, whose Q and R are fixed in its constructor (staff script, section 4). A grid that prints the same number 16 times is a bug report.
+- **Check the uncertainty you report.** The random forests' 80 percent interval covers 66 percent of test engines, which the notebook prints and the write-up calls good calibration. The linear filter's interval has a constant width, the network's dropout spread is never compared with its errors, and the hierarchical model's coverage is measured on rows rather than on the test engines' last cycles. Measure coverage where the decisions are made.
+- **Compare with a trivial baseline.** For the next bin of a slowly drifting sensor, "the bin does not change" is the baseline: 45.07 percent per engine here, and in the training data staying put is the most likely move from every bin (staff script, section 5). The DBN reports 75.92 percent (`DBN1.ipynb` cell 11), a large gain for a model in which sensor_11's next bin depends on the past only through its current bin and two operational settings that barely vary in FD001. The committed outputs come from a run in which the binning ran twice, and the evaluation loop skips any query that raises an error. Report the baseline with the model so the reader can judge.
+- **Make sure the committed outputs come from the committed code.** The logistic Prophet cell cannot run as saved, the BRNN source was translated after its outputs were produced, the DBN's binning ran twice, and three numbers in the write-up appear in no output. Restart the kernel and run top to bottom before the last commit.
+- **Integrate the plan or say that you did not.** The methodology document proposed one hybrid framework joining the network, the DBN and the hierarchical model, on all four C-MAPSS subsets, with maintenance decisions based on predictive confidence. The repository has separate models on FD001, linked only by the changepoint onset, and the write-up presents them as a planned progression.
+
+What the project does well: a Bayesian online changepoint detector written from scratch and used for a concrete purpose, setting the labels of another model; a hierarchical model in PyMC with non-centered intercepts, a split by engine, a coverage check, and convergence diagnostics printed rather than skipped; an unscented Kalman filter with noise matrices learned from smoothed states; a dynamic Bayesian network built and queried with exact inference; the standard last-cycle protocol in the BSTS, Prophet, UKF and BRNN notebooks; and, in the BSTS notebook, a first model that looked too good, a search for why, the leak found and the model replaced, all written up in the notebook's closing cells. That last habit is the one to copy.
+
+## About this project
+
+This project was built in Bayesian Machine Learning with Generative AI Applications (ADSP 32014), part of the Master of Science in Applied Data Science at the University of Chicago, in Winter 2026. It is shown here as an example for later cohorts.
+
+## Changes by course staff
+
+Course staff forked the authors' repository and made these edits. The authors' code is unchanged.
+
+- Deleted the top-level `metadata.widgets` entry from `brnn_v2.ipynb` and `DBN1.ipynb`. The entry had no `state` key, which stops GitHub from rendering a notebook at all; the cells and outputs are byte-for-byte unchanged, and `brnn_v2.ipynb` shrinks from 5.1 MB to 0.6 MB.
+- Removed `notebooks/time_series_models/Prophet_Meta.ipynb`, a byte-identical copy of `notebooks/prophet_model/Prophet_Meta.ipynb`.
+- Edited `.gitignore` so that `data/README.md` and the banner are kept while the C-MAPSS files, the downloaded archives and model checkpoints stay out.
+- Added `data/README.md`, on the source, terms, citation and download of C-MAPSS and the path each notebook expects, and `staff/check_scores.py`, the check described above.
+- Renamed the authors' README to `REPORT.md`, unchanged, and added this README with the program banner.
+
+## License
+
+The authors chose the MIT License; see [LICENSE](LICENSE), which names Adi Singh as the copyright holder. The C-MAPSS data carries its own terms, described in [data/README.md](data/README.md).
