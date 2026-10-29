@@ -26,7 +26,7 @@ The staff section below explains why that ranking does not hold: the notebooks f
 Team "The Priors of the Caribbean", Winter 2026.
 
 - **Adi Singh** ([@asingh49-cmd](https://github.com/asingh49-cmd)): the repository; the linear Kalman filter and the random-forest model, in both `bsts_kf_rul_comparison` notebooks, with their README and figures; the preprocessing in `LSTM_Model.ipynb`; the upload of the Prophet notebook into `prophet_model/`; and the BSTS and Kalman sections of the write-up.
-- **Ryan Chen** ([@RyanChenJung](https://github.com/RyanChenJung)): `BOCPD.ipynb`, both BRNN notebooks and the BRNN README, the folder layout and ignore rules, the EDA figure, and the merges of the team's pull requests. He also committed early copies of Eduardo's hierarchical model.
+- **Ryan Chen** ([@RyanChenJung](https://github.com/RyanChenJung)): `BOCPD.ipynb`, both BRNN notebooks and the BRNN README, the folder layout and ignore rules, the EDA figure, and the merges of the team's pull requests; Ryan also committed early copies of Eduardo's hierarchical model.
 - **William Niu** ([@williamniu](https://github.com/williamniu), committing as CasperNiu): `Prophet_Meta.ipynb` and the Prophet README, `GRU_Final_Version.ipynb`, and the last round of edits to the write-up, including its results table.
 - **Mukul Ramesh** ([@MukulRamesh](https://github.com/MukulRamesh)): `DBN1.ipynb` to `DBN4.ipynb`, which hold the dynamic Bayesian network and both versions of the unscented Kalman filter, the README for that folder, and the DBN and UKF sections of the write-up.
 - **Eduardo (Lalo) Tovilla Rivera** ([@Eduardo-Tovilla](https://github.com/Eduardo-Tovilla)): the hierarchical Bayesian model notebook and its README, and the project overview in the write-up.
